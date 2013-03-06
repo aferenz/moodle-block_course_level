@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-
 /**
- * Keeps track of the version number
+ * Global settings page.
  *
  * @package    block
  * @subpackage course_level
@@ -25,8 +24,14 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$plugin->version = 2013030403;
-$plugin->maturity = MATURITY_ALPHA;
-$plugin->requires = 2011070100; // 2.1.
-$plugin->component = 'block_course_level';
-$plugin->release = '0.3 (Build: 2013030403)';
+defined('MOODLE_INTERNAL') || die;
+
+if ($ADMIN->fulltree) {
+
+    $settings->add(new admin_setting_configtext('block_course_level/admin_tool_url', get_string('admin_tool_url', 'block_course_level'), '',
+        get_string('default_admin_tool_url', 'block_course_level'), PARAM_URL));
+
+    $settings->add(new admin_setting_configtext('block_course_level/admin_tool_magic_text', get_string('admin_tool_magic', 'block_course_level'), '',
+        get_string('default_admin_tool_magic', 'block_course_level'), PARAM_TEXT));
+
+}

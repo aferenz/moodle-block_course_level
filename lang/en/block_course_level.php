@@ -35,6 +35,7 @@ $string['view_all_courses']      = 'View all courses';
 
 $string['title']                 = 'Title';
 $string['showcode']              = 'Show course code';
+$string['showmoodlecourses']     = 'Show orphaned courses';
 $string['trimmodeleft']          = 'Trim characters from the left';
 $string['trimmoderight']         = 'Trim characters from the right';
 $string['trimmodecentre']        = 'Trim characters from the centre';
@@ -63,6 +64,7 @@ $string['link']                  = 'Quick link';
 $string['units']                 = 'Units';
 $string['courses']               = 'Courses';
 $string['year']                  = 'Year';
+$string['year_unknown']          = 'Year unknown (data missing from IDM)';
 
 // Tab links:
 $string['coursesview']           = 'Courses';
@@ -78,3 +80,14 @@ $string['programme_courses']     = 'Show courses';
 $string['homepage']              = 'Overview';
 $string['missing_homepage']      = 'Missing Course Homepage!';
 
+// Admin Tool link:
+$string['default_admin_tool_url'] = 'http://w01.ual01test.wf.ulcc.ac.uk/ual_admintool/login.php';
+$string['admin_tool_url']        = 'Admin tool URL';
+$string['admin_tool_link']       = 'Open admin tool';
+$string['admin_tool_magic']      = 'Admin tool magic text';
+$string['default_admin_tool_magic'] = 'qazmagicwsx123';
+
+// Capabilities
+$string['course_level:can_edit'] = 'Can edit';
+$string['course_level:admin_db_link'] = 'Display Admin DB Tool Link';
+$string['course_level:show_hidden_courses'] = 'Show hidden courses';

@@ -17,7 +17,7 @@
  * Basic install.txt file in English.
  *
  * @package   blocks-course_level
- * @copyright 2012 University of London Computer Centre
+ * @copyright 2012-13 University of London Computer Centre
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

@@ -19,7 +19,7 @@
  *
  * @package    block
  * @subpackage course_level
- * @copyright  2012 University of London Computer Centre
+ * @copyright  2012-13 University of London Computer Centre
  * @author     Ian Wild {@link http://moodle.org/user/view.php?id=325899}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -94,11 +94,16 @@ class block_course_level extends block_base {
         }
 
         $showcode = 0;
+        $showmoodlecourses = 0;
         $trimmode = 1;
         $trimlength = 50;
 
         if (!empty($this->config->showcode)) {
             $showcode = (int)$this->config->showcode;
+        }
+
+        if (!empty($this->config->showmoodlecourses)) {
+            $showmoodlecourses = (int)$this->config->showmoodlecourses;
         }
 
         if (!empty($this->config->trimmode)) {
@@ -109,12 +114,20 @@ class block_course_level extends block_base {
             $trimlength = (int)$this->config->trimlength;
         }
 
+        // Access to Admin Tool is set globally
+        $admin_tool_url = get_config('block_course_level', 'admin_tool_url');
+        $admin_tool_magic_text  = get_config('block_course_level', 'admin_tool_magic_text');
+
         // Load userdefined title and make sure it's never empty.
         if (empty($this->config->title)) {
             $this->title = get_string('courselevel', 'block_course_level');
         } else {
             $this->title = $this->config->title;
         }
+        
+        // Do we show hidden courses?
+        $context = get_context_instance(CONTEXT_SYSTEM);
+        $showhiddencourses = has_capability('block/course_level:show_hidden_courses', $context);
 
         $this->content = new stdClass();
 
@@ -131,7 +144,7 @@ class block_course_level extends block_base {
             if(!$courseid) {
                 $courseid = 1;  // Assume we are on the site front page
             }
-            $this->content->text = $renderer->course_level_tree($showcode, $trimmode, $trimlength, $courseid);
+            $this->content->text = $renderer->course_level_tree($showcode, $trimmode, $trimlength, $courseid, $showmoodlecourses, $admin_tool_url, $admin_tool_magic_text, $showhiddencourses);
             $this->content->footer = '';
 
         }
@@ -156,5 +169,44 @@ class block_course_level extends block_base {
      */
     public function instance_allow_multiple() {
         return false;
+    }
+
+    /**
+     * The 'My Moodle' block cannot be hidden by default as it is integral to
+     * the navigation of Moodle.
+     *
+     * @return false
+     */
+    function  instance_can_be_hidden() {
+        return false;
+    }
+
+    /**
+     * An instance can't be docked for the same reasons as for instance_can_be_hidden
+     *
+     * @return bool true or false depending on whether the instance can be docked or not.
+     */
+    function instance_can_be_docked() {
+        return false;
+    }
+
+    /**
+     * Don't allow anyone other than an administrator to delete this block as it's integral to
+     * the navigation of Moodle.
+     *
+     * @return boolean
+     */
+    function user_can_edit() {
+        $context = get_context_instance(CONTEXT_SYSTEM);
+        return (has_capability('block/course_level:can_edit', $context));
+    }
+
+    /**
+     * There are global settings associated with this block.
+     *
+     * @return bool
+     */
+    function has_config() {
+        return true;
     }
 }

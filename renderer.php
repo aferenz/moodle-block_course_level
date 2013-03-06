@@ -33,20 +33,28 @@ require_once($CFG->dirroot . '/blocks/course_level/lib.php');
 class block_course_level_renderer extends plugin_renderer_base {
 
     private $showcode = 0;
+    private $showmoodlecourses = 0;
     private $trimmode = block_course_level::TRIM_RIGHT;
     private $trimlength = 50;
     private $courseid = 0;
+    private $admin_tool_url = '';
+    private $admin_tool_magic_text = '';
+    private $showhiddencourses = false;
 
     /**
      * Prints course level tree view
      * @return string
      */
-    public function course_level_tree($showcode, $trimmode, $trimlength, $courseid) {
+    public function course_level_tree($showcode, $trimmode, $trimlength, $courseid, $showmoodlecourses, $admin_tool_url, $admin_tool_magic_text, $showhiddencourses) {
         $this->showcode = $showcode;
+        $this->showmoodlecourses = $showmoodlecourses;
         $this->trimmode = $trimmode;
         $this->trimlength = $trimlength;
         $this->courseid = $courseid;
-
+        $this->admin_tool_url = $admin_tool_url;
+        $this->admin_tool_magic_text = $admin_tool_magic_text;
+		$this->showhiddencourses = $showhiddencourses;
+		
         return $this->render(new course_level_tree);
     }
 
@@ -58,17 +66,41 @@ class block_course_level_renderer extends plugin_renderer_base {
      * @return string
      */
     public function render_course_level_tree(course_level_tree $tree) {
-        global $CFG;
+        global $CFG, $USER;
 
-        if (empty($tree) ) {
-            $html = $this->output->box(get_string('nocourses', 'block_course_level'));
-        } else {
+        $displayed_something = false;
 
+        $html = ""; // Start with an empty string.
+
+        if (!empty($tree->courses) ) {
             $htmlid = 'course_level_tree_'.uniqid();
             $this->page->requires->js_init_call('M.block_course_level.init_tree', array(false, $htmlid, $CFG->wwwroot.'/course/view.php?id='.$this->courseid));
             $html = '<div id="'.$htmlid.'">';
             $html .= $this->htmllize_tree($tree->courses);
             $html .= '</div>';
+
+            $displayed_something = true;
+        }
+
+        // Do we display courses that the user is enrolled on in Moodle but not enrolled on them according to the IDM data?
+        if($this->showmoodlecourses && !empty($tree->moodle_courses)) {
+            $html .= html_writer::empty_tag('hr');
+
+            $orphaned_courses = html_writer::start_tag('ul', array('class' => 'orphaned'));
+            foreach($tree->moodle_courses as $course) {
+                $courselnk = $CFG->wwwroot.'/course/view.php?id='.$course->id;
+                $linkhtml = html_writer::link($courselnk,$course->fullname, array('class' => 'orphaned_course'));
+                $orphaned_courses .= html_writer::tag('li', $linkhtml);
+            }
+            $orphaned_courses .= html_writer::end_tag('ul');
+
+            $html .= $orphaned_courses;
+
+            $displayed_something = true;
+        }
+
+        if(!$displayed_something) {
+            $html = $this->output->box(get_string('nocourses', 'block_course_level'));
         }
 
         // Add 'View all courses' link to bottom of block...
@@ -77,6 +109,26 @@ class block_course_level_renderer extends plugin_renderer_base {
         $attributes = array('class' => 'view-all');
         $span = html_writer::tag('span', '');
         $html .= html_writer::link($viewcourses_lnk, get_string('view_all_courses', 'block_course_level').$span, $attributes);
+
+        // Add 'Admin Tool' link (if necessary) UALMOODLE-161
+        // Display link to Admin DB tool?
+        $context = get_context_instance(CONTEXT_SYSTEM);
+        $display_admin_tool_link = has_capability('block/course_level:admin_db_link', $context);
+
+        if($display_admin_tool_link) {
+            // What is this user's role in MIS? Perform a strcmp for now as this is currently in development...
+            if(strcmp($tree->ual_user_role, 'STAFF') == 0) {
+                $button_text = get_string('admin_tool_link', 'block_course_level');
+                $redirect_url = $this->admin_tool_url;
+                $magic_text = $this->admin_tool_magic_text;
+                $html .="<div class='singlebutton'><form target='_blank' action='{$redirect_url}' method='post'>
+                         <input type='hidden' name='url' value='{$redirect_url}'/>
+                         <input type='hidden' name='username' value='{$USER->username}'/>
+                         <input type='hidden' name='magic' value='{$magic_text}'/>
+                         <input type='submit' id='admin_tool_submit' value='{$button_text}'/>
+                         </form></div>";
+            }
+        }
 
         return $html;
     }
@@ -94,11 +146,10 @@ class block_course_level_renderer extends plugin_renderer_base {
         $yuiconfig = array();
         $yuiconfig['type'] = 'html';
 
-        $result = '<ul>';
+        $result = html_writer::start_tag('ul');
 
         if (!empty($tree)) {
             foreach ($tree as $node) {
-
                 // Does this node have any children?
                 $children = $node->get_children();
 
@@ -107,7 +158,6 @@ class block_course_level_renderer extends plugin_renderer_base {
                 if($this->showcode == 1) {
                     $name .= ' ('.$node->get_idnumber().')';
                 }
-
 
                 // Fix to bug UALMOODLE-58: look for ampersand in fullname and replace it with entity
                 $name = preg_replace('/&(?![#]?[a-z0-9]+;)/i', "&amp;$1", $name);
@@ -131,7 +181,8 @@ class block_course_level_renderer extends plugin_renderer_base {
                         $type_class = 'unit';
                         break;
                 }
-
+                
+                $display_node = $node->get_visible() || $this->showhiddencourses;
 
                 $attributes = array();
 
@@ -139,17 +190,24 @@ class block_course_level_renderer extends plugin_renderer_base {
                 $span = html_writer::tag('span', '');
 
                 if ($children == null) {
-                    $attributes['title'] = $name;
+                    if($display_node) {
+                        // Only write out the node if the course it represents is visible
+                        $attributes['title'] = $name;
 
-                    if($node->get_user_enrolled() == true) {
-                        $moodle_url = $CFG->wwwroot.'/course/view.php?id='.$node->get_moodle_course_id();
-                        $content = html_writer::link($moodle_url, $name, $attributes);
-                    } else {
-                        // Display the name but it's not clickable...
-                        // TODO make this a configuration option...
-                        $content = html_writer::tag('i', $name, $attributes);
+                        if(($node->get_user_enrolled() == true) && $node->get_visible()) {
+                            $moodle_url = $CFG->wwwroot.'/course/view.php?id='.$node->get_moodle_course_id();
+                            $content = html_writer::link($moodle_url, $name, $attributes);
+                        } else {
+                            // Display the name but it's not clickable...
+                            // TODO make this a configuration option...
+                            if($this->showhiddencourses) {
+                            	$attributes['class'] = 'hidden';
+                            }
+                            $content = html_writer::tag('i', $name, $attributes);
+                        }
+
+                        $result .= html_writer::tag('li', $content, array('yuiConfig'=>json_encode($yuiconfig), 'class' => $type_class));
                     }
-                    $result .= html_writer::tag('li', $content, array('yuiConfig'=>json_encode($yuiconfig), 'class' => $type_class));
                 } else {
                     // This is an expandable node...
                     $content = html_writer::tag('div', $name.$span, $attributes);
@@ -158,12 +216,12 @@ class block_course_level_renderer extends plugin_renderer_base {
                         $attributes['class'] = 'expanded';
                     }
 
-
                     $result .= html_writer::tag('li', $content.$this->htmllize_tree($children, $indent+1), array('yuiConfig'=>json_encode($yuiconfig), 'class' => $type_class));
                 }
             }
         }
-        $result .= '</ul>';
+
+        $result .= html_writer::end_tag('ul');
 
         return $result;
     }
